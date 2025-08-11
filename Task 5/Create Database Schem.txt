@@ -1,0 +1,110 @@
+Create Database Schem
+
+use schem
+
+
+CREATE TABLE Customers (
+  customer_id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100),
+  email VARCHAR(100) UNIQUE,
+  phone VARCHAR(15),
+  referrer_id INT NULL,          -- for self-join demo
+  FOREIGN KEY (referrer_id) REFERENCES Customers(customer_id)
+);
+
+CREATE TABLE Orders (
+  order_id INT PRIMARY KEY AUTO_INCREMENT,
+  customer_id INT,
+  order_date DATE,
+  total DECIMAL(10,2),
+  status VARCHAR(20),
+  FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+);
+
+CREATE TABLE Products (
+  product_id INT PRIMARY KEY AUTO_INCREMENT,
+  product_name VARCHAR(150),
+  price DECIMAL(8,2)
+);
+
+CREATE TABLE OrderItems (
+  orderitem_id INT PRIMARY KEY AUTO_INCREMENT,
+  order_id INT,
+  product_id INT,
+  qty INT,
+  FOREIGN KEY (order_id) REFERENCES Orders(order_id),
+  FOREIGN KEY (product_id) REFERENCES Products(product_id)
+);
+
+
+Insert Statements
+
+INSERT INTO Customers (name,email,phone,referrer_id) VALUES
+('Vijay','vijay@example.com','9876543210', NULL),
+('Arjun','arjun@example.com','9123456780', 1),
+('Meena','meena@example.com','9988776655', NULL);
+
+INSERT INTO Products (product_name,price) VALUES
+('T-shirt',299.00), ('Cap',129.00), ('Mug',199.00);
+
+INSERT INTO Orders (customer_id, order_date, total, status) VALUES
+(1,'2025-08-01',428.00,'delivered'),
+(1,'2025-08-07',129.00,'processing'),
+(3,'2025-08-09',199.00,'delivered');
+
+INSERT INTO OrderItems (order_id, product_id, qty) VALUES
+(1,1,1),(1,2,1),(2,2,1),(3,3,1);
+
+
+INNER JOIN
+
+SELECT c.customer_id, c.name, o.order_id, o.order_date
+FROM Customers c
+INNER JOIN Orders o ON c.customer_id = o.customer_id;
+
+LEFT JOIN
+
+SELECT c.customer_id, c.name, o.order_id
+FROM Customers c
+LEFT JOIN Orders o ON c.customer_id = o.customer_id;
+
+RIGHT JOIN
+
+SELECT c.customer_id, c.name, o.order_id
+FROM Customers c
+RIGHT JOIN Orders o ON c.customer_id = o.customer_id;
+
+FULL OUTER JOIN
+
+SELECT c.customer_id, c.name, o.order_id
+FROM Customers c
+LEFT JOIN Orders o ON c.customer_id = o.customer_id
+UNION
+SELECT c.customer_id, c.name, o.order_id
+FROM Customers c
+RIGHT JOIN Orders o ON c.customer_id = o.customer_id;
+
+CROSS JOIN
+
+SELECT c.name, p.product_name
+FROM Customers c
+CROSS JOIN Products p
+LIMIT 10;
+
+NATURAL JOIN
+
+SELECT * FROM Customers NATURAL JOIN Orders;
+
+SELF JOIN
+
+SELECT a.name AS referrer, b.name AS referee
+FROM Customers a
+JOIN Customers b ON a.customer_id = b.referrer_id;
+
+nested joins 
+
+SELECT c.name, o.order_id, p.product_name, oi.qty
+FROM Customers c
+JOIN Orders o ON c.customer_id = o.customer_id
+JOIN OrderItems oi ON o.order_id = oi.order_id
+JOIN Products p ON oi.product_id = p.product_id;
