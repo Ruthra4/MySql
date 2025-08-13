@@ -1,0 +1,189 @@
+create database task6;
+
+use task6;
+
+CREATE TABLE Customers (
+    customer_id INT PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(120) UNIQUE,
+    referrer_id INT NULL
+);
+
+CREATE TABLE Orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE,
+    total DECIMAL(10,2),
+    status VARCHAR(20)
+);
+
+CREATE TABLE Products (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(120),
+    price DECIMAL(10,2)
+);
+
+CREATE TABLE OrderItems (
+    orderitem_id INT PRIMARY KEY,
+    order_id INT,
+    product_id INT,
+    qty INT
+);
+
+CREATE INDEX idx_orders_customer ON Orders(customer_id);
+
+CREATE INDEX idx_orderitems_order ON OrderItems(order_id);
+
+CREATE INDEX idx_orderitems_product ON OrderItems(product_id);
+
+
+INSERT INTO Customers VALUES
+(1, 'Vijay', 'vijay@example.com', NULL),
+(2, 'Arjun', 'arjun@example.com', 1),
+(3, 'Meena', 'meena@example.com', NULL),
+(4, 'Ravi', 'ravi@example.com', 2),
+(5, 'Priya', 'priya@example.com', NULL);
+
+
+INSERT INTO Products VALUES
+(1, 'T-shirt', 299.00),
+(2, 'Cap', 129.00),
+(3, 'Mug', 199.00),
+(4, 'Shoes', 799.00),
+(5, 'Jacket', 1499.00);
+
+
+INSERT INTO Orders VALUES
+(1, 1, '2025-08-01', 428.00, 'delivered'),
+(2, 1, '2025-08-07', 129.00, 'processing'),
+(3, 3, '2025-08-09', 199.00, 'delivered'),
+(4, 2, '2025-08-10', 1798.00, 'delivered'),
+(5, 4, '2025-08-11', 1499.00, 'pending');
+
+
+INSERT INTO OrderItems VALUES
+(1, 1, 1, 1),  -- T-shirt
+(2, 1, 2, 1),  -- Cap
+(3, 2, 2, 1),  -- Cap
+(4, 3, 3, 1),  -- Mug
+(5, 4, 4, 2),  -- Shoes
+(6, 5, 5, 1);  -- Jacket
+
+
+SELECT c.customer_id, c.name,
+       (SELECT MAX(o.order_date)
+        FROM Orders o
+        WHERE o.customer_id = c.customer_id) AS last_order_date
+FROM Customers c;
+
+
+SELECT c.customer_id, c.name,
+       (SELECT COUNT(*)
+        FROM Orders o
+        WHERE o.customer_id = c.customer_id) AS order_count
+FROM Customers c;
+
+
+SELECT o.*
+FROM Orders o
+WHERE o.total > (
+    SELECT AVG(o2.total)
+    FROM Orders o2
+    WHERE o2.customer_id = o.customer_id
+);
+
+
+SELECT DISTINCT c.customer_id, c.name
+FROM Customers c
+WHERE c.customer_id IN (
+    SELECT o.customer_id
+    FROM Orders o
+    JOIN OrderItems oi ON oi.order_id = o.order_id
+    JOIN Products p ON p.product_id = oi.product_id
+    WHERE p.price > 500
+);
+
+
+SELECT c.*
+FROM Customers c
+WHERE EXISTS (
+    SELECT 1
+    FROM Orders o
+    WHERE o.customer_id = c.customer_id
+      AND o.status = 'delivered'
+);
+
+
+SELECT c.*
+FROM Customers c
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Orders o
+    WHERE o.customer_id = c.customer_id
+);
+
+
+SELECT s.customer_id, s.total_spent
+FROM (
+    SELECT o.customer_id, SUM(o.total) AS total_spent
+    FROM Orders o
+    GROUP BY o.customer_id
+) AS s
+WHERE s.total_spent >= 1000
+ORDER BY s.total_spent DESC;
+
+
+SELECT s.customer_id, s.total_spent
+FROM (
+    SELECT o.customer_id, SUM(o.total) AS total_spent
+    FROM Orders o
+    GROUP BY o.customer_id
+) AS s
+WHERE s.total_spent > (SELECT AVG(total) FROM Orders);
+
+
+SELECT o.*
+FROM Orders o
+WHERE o.total > ANY (
+    SELECT total
+    FROM Orders
+    WHERE customer_id IN (1, 2, 3)
+);
+
+
+SELECT c.*
+FROM Customers c
+WHERE c.customer_id IN (
+    SELECT o.customer_id
+    FROM Orders o
+    JOIN OrderItems oi ON oi.order_id = o.order_id
+    JOIN Products p ON p.product_id = oi.product_id
+    WHERE p.product_name = 'Mug'
+);
+
+
+SELECT DISTINCT c.*
+FROM Customers c
+JOIN Orders o ON o.customer_id = c.customer_id
+JOIN OrderItems oi ON oi.order_id = o.order_id
+JOIN Products p ON p.product_id = oi.product_id
+WHERE p.product_name = 'Mug';
+
+
+SELECT c.*
+FROM Customers c
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Orders o
+    WHERE o.customer_id = c.customer_id
+);
+
+
+SELECT o.*
+FROM Orders o
+WHERE (o.customer_id, o.total) IN (
+    SELECT customer_id, MAX(total)
+    FROM Orders
+    GROUP BY customer_id
+);
+
