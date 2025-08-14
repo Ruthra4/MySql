@@ -1,0 +1,183 @@
+create database schm;
+
+use schm;
+
+-- STEP 1: Create base tables
+
+-- Customers
+CREATE TABLE IF NOT EXISTS Customers (
+    customer_id   INTEGER PRIMARY KEY,
+    name          VARCHAR(100),
+    email         VARCHAR(120) UNIQUE,
+    referrer_id   INTEGER NULL
+);
+
+-- Orders
+CREATE TABLE IF NOT EXISTS Orders (
+    order_id     INTEGER PRIMARY KEY,
+    customer_id  INTEGER,
+    order_date   DATE,
+    total        DECIMAL(10,2),
+    status       VARCHAR(20)
+);
+
+-- Products
+CREATE TABLE IF NOT EXISTS Products (
+    product_id    INTEGER PRIMARY KEY,
+    product_name  VARCHAR(120),
+    price         DECIMAL(10,2)
+);
+
+-- OrderItems
+CREATE TABLE IF NOT EXISTS OrderItems (
+    orderitem_id INTEGER PRIMARY KEY,
+    order_id     INTEGER,
+    product_id   INTEGER,
+    qty          INTEGER
+);
+
+CREATE INDEX idx_orders_customer ON Orders(customer_id);
+CREATE INDEX idx_orderitems_order ON OrderItems(order_id);
+CREATE INDEX idx_orderitems_product ON OrderItems(product_id);
+
+
+-- STEP 2: Seed data
+
+INSERT INTO Customers (customer_id, name, email, referrer_id) VALUES
+(1, 'Vijay', 'vijay@example.com', NULL),
+(2, 'Arjun', 'arjun@example.com', 1),
+(3, 'Meena', 'meena@example.com', NULL),
+(4, 'Ravi',  'ravi@example.com', 2),
+(5, 'Priya', 'priya@example.com', NULL)
+
+INSERT INTO Products (product_id, product_name, price) VALUES
+(1, 'T-shirt', 299.00),
+(2, 'Cap',     129.00),
+(3, 'Mug',     199.00),
+(4, 'Shoes',   799.00),
+(5, 'Jacket', 1499.00)
+
+
+INSERT INTO Orders (order_id, customer_id, order_date, total, status) VALUES
+(1, 1, '2025-08-01',  428.00, 'delivered'),
+(2, 1, '2025-08-07',  129.00, 'processing'),
+(3, 3, '2025-08-09',  199.00, 'delivered'),
+(4, 2, '2025-08-10', 1798.00, 'delivered'),
+(5, 4, '2025-08-11', 1499.00, 'pending')
+
+
+INSERT INTO OrderItems (orderitem_id, order_id, product_id, qty) VALUES
+(1, 1, 1, 1),  -- order 1: T-shirt
+(2, 1, 2, 1),  -- order 1: Cap
+(3, 2, 2, 1),  -- order 2: Cap
+(4, 3, 3, 1),  -- order 3: Mug
+(5, 4, 4, 2),  -- order 4: Shoes x2
+(6, 5, 5, 1)   -- order 5: Jacket
+
+DROP VIEW IF EXISTS v_customers_public;
+CREATE VIEW v_customers_public AS
+SELECT customer_id, name
+FROM Customers;
+
+SELECT * FROM v_customers_public;
+
+DROP VIEW IF EXISTS v_delivered_orders;
+CREATE VIEW v_delivered_orders AS
+SELECT order_id, customer_id, order_date, total, status
+FROM Orders
+WHERE status = 'delivered';
+
+SELECT * FROM v_delivered_orders ORDER BY order_date;
+
+DROP VIEW IF EXISTS v_order_details;
+CREATE VIEW v_order_details AS
+SELECT
+  o.order_id,
+  o.order_date,
+  o.status,
+  c.customer_id,
+  c.name        AS customer_name,
+  p.product_id,
+  p.product_name,
+  oi.qty,
+  p.price,
+  (oi.qty * p.price) AS line_total
+FROM Orders o
+JOIN Customers c  ON c.customer_id = o.customer_id
+JOIN OrderItems oi ON oi.order_id   = o.order_id
+JOIN Products p    ON p.product_id  = oi.product_id;
+
+SELECT * FROM v_order_details WHERE order_id = 1;
+
+DROP VIEW IF EXISTS v_customer_spend;
+CREATE VIEW v_customer_spend AS
+SELECT
+  c.customer_id,
+  c.name,
+  COALESCE(SUM(o.total), 0) AS total_spent,
+  COUNT(o.order_id)         AS orders_count
+FROM Customers c
+LEFT JOIN Orders o ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.name;
+
+SELECT * FROM v_customer_spend ORDER BY total_spent DESC;
+
+DROP VIEW IF EXISTS v_customer_last_order;
+CREATE VIEW v_customer_last_order AS
+SELECT
+  c.customer_id,
+  c.name,
+  (
+    SELECT MAX(o.order_date)
+    FROM Orders o
+    WHERE o.customer_id = c.customer_id
+  ) AS last_order_date
+FROM Customers c;
+
+SELECT * 
+FROM v_customer_last_order
+ORDER BY last_order_date IS NULL, last_order_date DESC;
+
+DROP VIEW IF EXISTS v_processing_orders;
+CREATE VIEW v_processing_orders AS
+SELECT order_id, customer_id, order_date, total, status
+FROM Orders
+WHERE status = 'processing'
+WITH CHECK OPTION;
+
+UPDATE v_processing_orders
+SET total = total + 10
+WHERE order_id = 2;
+
+INSERT INTO v_processing_orders (order_id, customer_id, order_date, total, status)
+VALUES (6, 1, CURDATE(), 250.00, 'processing');
+
+SELECT * FROM v_processing_orders;
+SELECT * FROM Orders WHERE order_id IN (2,6);
+
+DROP TABLE IF EXISTS v_customer_spend_mv;
+CREATE TABLE v_customer_spend_mv AS
+SELECT * FROM v_customer_spend;
+
+SELECT * FROM v_customer_spend_mv ORDER BY total_spent DESC;
+
+DROP VIEW IF EXISTS v_orders_metrics;
+CREATE VIEW v_orders_metrics AS
+SELECT
+  o.order_id,
+  o.order_date,
+  o.status,
+  (SELECT COUNT(*) FROM OrderItems oi WHERE oi.order_id = o.order_id) AS items_count,
+  o.total
+FROM Orders o;
+
+SELECT * FROM v_orders_metrics ORDER BY order_date;
+
+DROP VIEW IF EXISTS v_orders_metrics;
+DROP VIEW IF EXISTS v_processing_orders;
+DROP VIEW IF EXISTS v_customer_last_order;
+DROP VIEW IF EXISTS v_customer_spend;
+DROP VIEW IF EXISTS v_order_details;
+DROP VIEW IF EXISTS v_delivered_orders;
+DROP VIEW IF EXISTS v_customers_public;
+
